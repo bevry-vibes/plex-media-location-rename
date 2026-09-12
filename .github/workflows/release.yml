@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --locked
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release create "$GITHUB_REF_NAME" --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  artifacts:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, os-name: macos, arch: aarch64 }
+          - { os: macos-13, os-name: macos, arch: x86_64 }
+          - { os: ubuntu-latest, os-name: linux, arch: x86_64 }
+          - { os: ubuntu-24.04-arm, os-name: linux, arch: aarch64 }
+          - { os: windows-latest, os-name: windows, arch: x86_64 }
+          - { os: windows-11-arm, os-name: windows, arch: aarch64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --release --locked
+      - shell: bash
+        run: |
+          name="plex-media-location-rename-${{ matrix.os-name }}-${{ matrix.arch }}"
+          bin="plex-media-location-rename"
+          if [ "${{ matrix.os-name }}" = "windows" ]; then bin="$bin.exe"; fi
+          cp "target/release/$bin" "$name"
+          sha256sum "$name" > "$name.sha256"
+          gh release upload "$GITHUB_REF_NAME" "$name" "$name.sha256" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
