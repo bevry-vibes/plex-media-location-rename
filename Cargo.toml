@@ -1,6 +1,6 @@
 [package]
 name = "plex-media-location-rename"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Rewrite moved media paths inside a Plex library database, without losing added dates."
 license = "RPL-1.5"
