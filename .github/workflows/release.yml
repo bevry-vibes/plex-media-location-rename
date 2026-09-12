@@ -9,9 +9,15 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
 
   publish:
@@ -19,42 +25,61 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: cargo publish --locked
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: publish to crates.io
+        run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  release:
+  package:
     needs: publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - run: gh release create "$GITHUB_REF_NAME" --verify-tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  artifacts:
-    needs: release
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-latest, os-name: macos, arch: aarch64 }
-          - { os: macos-13, os-name: macos, arch: x86_64 }
-          - { os: ubuntu-latest, os-name: linux, arch: x86_64 }
-          - { os: ubuntu-24.04-arm, os-name: linux, arch: aarch64 }
-          - { os: windows-latest, os-name: windows, arch: x86_64 }
-          - { os: windows-11-arm, os-name: windows, arch: aarch64 }
+          - { os: macos-latest, os-name: macos, arch: aarch64, target: aarch64-apple-darwin }
+          - { os: macos-latest, os-name: macos, arch: x86_64, target: x86_64-apple-darwin }
+          - { os: ubuntu-latest, os-name: linux, arch: x86_64, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, os-name: linux, arch: aarch64, target: aarch64-unknown-linux-gnu }
+          - { os: windows-latest, os-name: windows, arch: x86_64, target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, os-name: windows, arch: aarch64, target: aarch64-pc-windows-msvc }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - run: cargo build --release --locked
-      - shell: bash
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      # Publish runs before packaging, because cargo publish needs a clean tree.
+      - name: package (zip + sha256)
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
           name="plex-media-location-rename-${{ matrix.os-name }}-${{ matrix.arch }}"
-          bin="plex-media-location-rename"
-          if [ "${{ matrix.os-name }}" = "windows" ]; then bin="$bin.exe"; fi
-          cp "target/release/$bin" "$name"
-          sha256sum "$name" > "$name.sha256"
-          gh release upload "$GITHUB_REF_NAME" "$name" "$name.sha256" --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
+          mkdir -p dist
+          zip -j "dist/$name.zip" "target/${{ matrix.target }}/release/plex-media-location-rename"
+          (cd dist && shasum -a 256 "$name.zip" > "$name.zip.sha256")
+      - name: package (tar.gz + sha256)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          name="plex-media-location-rename-${{ matrix.os-name }}-${{ matrix.arch }}"
+          mkdir -p dist
+          tar -czf "dist/$name.tar.gz" -C "target/${{ matrix.target }}/release" plex-media-location-rename
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+      - name: package (zip + sha256)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "plex-media-location-rename-${{ matrix.os-name }}-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive "target/${{ matrix.target }}/release/plex-media-location-rename.exe" "dist/$name.zip"
+          $hash = (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower()
+          [System.IO.File]::WriteAllText("$PWD/dist/$name.zip.sha256", "$hash  $name.zip`n")
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
