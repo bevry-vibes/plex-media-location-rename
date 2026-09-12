@@ -4,6 +4,16 @@ A Rust command line tool that rewrites moved media paths inside a Plex library d
 
 Plex stores the path of every media file inside `com.plexapp.plugins.library.db`. When a media folder moves or renames, those stored paths break. The usual fix inside Plex is to remove the library folder and add it again, which loses the added dates and the watch history. This tool instead rewrites the stored paths in place, so the added dates, the play history, and the playlists survive.
 
+## install
+
+Install with cargo:
+
+```sh
+cargo install plex-media-location-rename
+```
+
+The tool runs on macOS, Linux, and Windows. You can also build from source with `cargo build --release`.
+
 ## usage
 
 Stop the Plex server first. The tool refuses to run while a Plex process exists.
