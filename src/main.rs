@@ -147,19 +147,35 @@ fn check_disk(maps: &[Map]) -> Result<(), String> {
 }
 
 fn check_processes() -> Result<(), String> {
-	let output = Command::new("ps").args(["axo", "comm="]).output().map_err(|e| format!("The process list failed: {e}"))?;
-	let list = String::from_utf8_lossy(&output.stdout).into_owned();
 	let mut found = Vec::new();
-	for name in list.lines() {
-		let name = name.trim();
+	for name in process_names()? {
 		if name.starts_with("Plex") && !name.starts_with("Plexamp") {
-			found.push(name.to_string());
+			found.push(name);
 		}
 	}
 	if !found.is_empty() {
 		return Err(format!("A Plex process runs: {}. Stop the Plex server, then run again.", found.join(", ")));
 	}
 	Ok(())
+}
+
+#[cfg(unix)]
+fn process_names() -> Result<Vec<String>, String> {
+	let output = Command::new("ps").args(["axo", "comm="]).output().map_err(|e| format!("The process list failed: {e}"))?;
+	Ok(String::from_utf8_lossy(&output.stdout).lines().map(|line| line.trim().to_string()).collect())
+}
+
+#[cfg(windows)]
+fn process_names() -> Result<Vec<String>, String> {
+	let output = Command::new("tasklist").args(["/FO", "CSV", "/NH"]).output().map_err(|e| format!("The process list failed: {e}"))?;
+	let mut names = Vec::new();
+	for line in String::from_utf8_lossy(&output.stdout).lines() {
+		let Some(rest) = line.strip_prefix('"') else { continue };
+		if let Some(end) = rest.find('"') {
+			names.push(rest[..end].to_string());
+		}
+	}
+	Ok(names)
 }
 
 fn open_database(path: &Path) -> Result<Connection, String> {
