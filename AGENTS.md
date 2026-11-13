@@ -6,7 +6,8 @@ When a referenced skill applies with your project's tweaks, the local `<name>.md
 this process is documented in the upstream repo's [local tweaks pattern](https://github.com/bevry-vibes/skills#local-tweaks-pattern).
 
 - https://github.com/bevry-vibes/skills/blob/main/policy.md — **applies**. Check the reciprocity of the harness, the provider, and the model with agent-detect before you work.
-- https://github.com/bevry-vibes/skills/blob/main/commits.md — **applies**. Conventional Commits, the system git identity as author, and the agent-detect co-author trailer.
+- https://github.com/bevry-vibes/skills/blob/main/secrets.md — **applies.** Secrets come only from their documented locations; never probe for them, print them, or commit them
+- https://github.com/bevry-vibes/skills/blob/main/commits.md — **applies.** Commit hygiene and the release flow: version bump, draft the notes, the annotated `<version>` tag carries them, and the workflow publishes the release with the tag's message as the body
 - https://github.com/bevry-vibes/skills/blob/main/plans.md — **applies**. Plans live in `.plans/` with a prompts companion.
 - https://github.com/bevry-vibes/skills/blob/main/build.md — does not apply. This project is a command line tool, not a menu-bar or tray app.
 - https://github.com/bevry-vibes/skills/blob/main/powershell.md — does not apply. The implementation language is Rust, not PowerShell.
