@@ -1,0 +1,2 @@
+# Bevry convention: Rust is tab-indented, matching .editorconfig.
+hard_tabs = true
