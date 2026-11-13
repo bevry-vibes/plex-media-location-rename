@@ -1,0 +1,4 @@
+# Pin the toolchain: rustfmt and clippy output must match CI.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
